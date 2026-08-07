@@ -30,8 +30,8 @@ BASE_YDL_OPTS = {
     "nocheckcertificate": True,
     "extractor_args": {
         "youtube": {
-            "player_client": ["android", "web"],
-            "player_skip": ["configs", "webpage"],
+            "player_client": ["android"],
+            "player_skip": ["configs"],
         }
     },
 }
