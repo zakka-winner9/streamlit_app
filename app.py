@@ -23,15 +23,22 @@ import yt_dlp
 st.set_page_config(page_title="Video Downloader", page_icon="⬇️", layout="centered")
 
 
-def check_password() -> bool:
-    """Simple password gate backed by Streamlit secrets (st.secrets['APP_PASSWORD']).
+# Base configuration for yt-dlp to bypass YouTube 403 Forbidden checks
+BASE_YDL_OPTS = {
+    "quiet": True,
+    "no_color": True,
+    "nocheckcertificate": True,
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "web"],
+            "player_skip": ["configs", "webpage"],
+        }
+    },
+}
 
-    Set the secret locally in .streamlit/secrets.toml (never commit this file —
-    see .gitignore) or, on Streamlit Community Cloud, under
-    App settings -> Secrets in the dashboard. This is a basic shared-password
-    gate, not real per-user auth — fine for keeping a personal tool from being
-    open to the public internet, not intended for multi-user access control.
-    """
+
+def check_password() -> bool:
+    """Simple password gate backed by Streamlit secrets (st.secrets['APP_PASSWORD'])."""
     if st.session_state.get("authenticated"):
         return True
 
@@ -68,7 +75,7 @@ with col1:
         index=0,
     )
 with col2:
-    fetch_info = st.button("Fetch info", use_container_width=True)
+    fetch_info = st.button("Fetch info", width="stretch")
 
 # ---- Step 1: fetch metadata (title, duration, thumbnail) without downloading ----
 if fetch_info:
@@ -77,7 +84,8 @@ if fetch_info:
     else:
         with st.spinner("Fetching video info..."):
             try:
-                with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+                fetch_opts = {**BASE_YDL_OPTS, "skip_download": True}
+                with yt_dlp.YoutubeDL(fetch_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                 st.session_state["video_info"] = {
                     "title": info.get("title", "video"),
@@ -94,7 +102,7 @@ if fetch_info:
 info = st.session_state.get("video_info")
 if info and st.session_state.get("url_checked") == url:
     if info["thumbnail"]:
-        st.image(info["thumbnail"], use_container_width=True)
+        st.image(info["thumbnail"], width="stretch")
     st.write(f"**{info['title']}**")
     if info["uploader"]:
         st.caption(f"By {info['uploader']}")
@@ -103,7 +111,7 @@ if info and st.session_state.get("url_checked") == url:
         st.caption(f"Duration: {mins}:{secs:02d}")
 
     # ---- Step 2: actually download ----
-    if st.button("Download", type="primary", use_container_width=True):
+    if st.button("Download", type="primary", width="stretch"):
         with st.spinner("Downloading — this can take a while for longer or higher-quality videos..."):
             tmpdir = tempfile.mkdtemp()
             try:
@@ -126,10 +134,10 @@ if info and st.session_state.get("url_checked") == url:
                     ext_hint = "mp4"
 
                 ydl_opts = {
+                    **BASE_YDL_OPTS,
                     "format": fmt,
                     "outtmpl": os.path.join(tmpdir, "%(title)s.%(ext)s"),
                     "postprocessors": postprocessors,
-                    "quiet": True,
                     "noplaylist": True,
                 }
 
@@ -152,7 +160,7 @@ if info and st.session_state.get("url_checked") == url:
                     label=f"Save {match}",
                     data=file_bytes,
                     file_name=match,
-                    use_container_width=True,
+                    width="stretch",
                 )
             except Exception as e:
                 st.error(f"Download failed: {e}")
